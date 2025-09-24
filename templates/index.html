@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lost & Found QR Generator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <!-- Hero Section -->
+  <header class="hero">
+  <div class="hero-content">
+    <h1>College Lost & Found QR System</h1>
+    <p>
+      Effortlessly generate QR codes for student belongings.  
+      Anyone scanning the QR can notify you directly via WhatsApp.  
+      Streamline item recovery and ensure quick, reliable communication.
+    </p>
+    <a href="#generate" class="cta-btn">Generate Your QR Code</a>
+  </div>
+</header>
+
+  <!-- QR Generator Section -->
+  <main class="container" id="generate">
+    <div class="card">
+      <h2>Generate Your WhatsApp QR Code</h2>
+      <p>
+        Enter your College ID and WhatsApp number below.  
+        Optionally, add a custom message to be sent when someone finds your item.
+      </p>
+      <form id="qrForm">
+          <input type="text" name="collegeId" id="collegeId" placeholder="College ID (e.g., STU1234)" required>
+          <input type="text" name="phoneNumber" id="phoneNumber" placeholder="Your WhatsApp Number (without + or 91)" required>
+          <textarea name="customMessage" id="customMessage" placeholder="Custom message (optional)" rows="3"></textarea>
+          <button type="submit">Generate QR</button>
+      </form>
+      <div id="qrPreview" class="preview">
+          Your QR code will appear here.
+      </div>
+    </div>
+  </main>
+
+
+  <footer>
+    <p>
+      &copy; 2025 Creative Thinking Project | College Lost & Found QR System  
+      Designed for simplicity, speed, and efficiency in item recovery.
+    </p>
+  </footer>
+
+
+  <!-- Script for QR Preview -->
+  <script>
+    const form = document.getElementById('qrForm');
+    const preview = document.getElementById('qrPreview');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      preview.textContent = 'Generating QR...';
+      const formData = new FormData(form);
+      const response = await fetch('/generate_qr', { method: 'POST', body: formData });
+
+      if (!response.ok) {
+        preview.textContent = 'Error generating QR.';
+        return;
+      }
+
+      const blob = await response.blob();
+      const imgURL = URL.createObjectURL(blob);
+      preview.innerHTML = '';
+
+      const img = document.createElement('img');
+      img.src = imgURL;
+      img.alt = 'QR Code';
+      img.width = 250;
+      preview.appendChild(img);
+
+      const dl = document.createElement('a');
+      dl.href = imgURL;
+      dl.download = 'qr_code.png';
+      dl.textContent = 'Download QR';
+      dl.className = 'btn';
+      preview.appendChild(dl);
+    });
+  </script>
+</body>
+</html>
