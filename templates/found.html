@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Item Found</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-content">
+      <h1>Item Found</h1>
+      <p>You have found an item belonging to College ID: <strong>{{ college_id }}</strong></p>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <h2>Notify the Owner</h2>
+      <p>Click the button below to send an anonymous notification to the owner. Your number will not be shared.</p>
+
+      <form id="notifyForm">
+        <textarea name="finder_message" id="finder_message" placeholder="Add an optional message (e.g., 'I left it at the library front desk.')" rows="4"></textarea>
+        <button type="submit" id="submitButton">Send Anonymous Notification</button>
+      </form>
+
+      <div id="statusMessage" style="margin-top: 1.5rem; font-weight: bold; font-size: 1.1rem;"></div>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2025 Creative Thinking Project | College Lost & Found QR System</p>
+  </footer>
+
+  <script>
+    const form = document.getElementById('notifyForm');
+    const statusMessage = document.getElementById('statusMessage');
+    const submitButton = document.getElementById('submitButton');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusMessage.textContent = 'Sending notification...';
+      submitButton.disabled = true;
+
+      const formData = new FormData(form);
+      const response = await fetch('/notify/{{ college_id }}', {
+        method: 'POST',
+        body: formData
+      });
+
+      const responseText = await response.text();
+
+      if (response.ok) {
+        statusMessage.textContent = responseText;
+        statusMessage.style.color = 'var(--dark)';
+        form.style.display = 'none'; // Hide form after success
+      } else {
+        statusMessage.textContent = responseText;
+        statusMessage.style.color = 'var(--accent)';
+        submitButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
