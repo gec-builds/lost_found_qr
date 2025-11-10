@@ -33,17 +33,13 @@ class Item(db.Model):
     phone_number = db.Column(db.String(20), nullable=False)
     custom_message = db.Column(db.String(300), nullable=True)
 
-# --- NEW: Create tables safely ---
-# This function will run once before the first request
+# --- Create tables safely ---
 @app.before_request
 def create_tables():
-    # Use 'g' to ensure this only runs ONCE per app start, not per request
     if not getattr(g, '_database_initialized', False):
         with app.app_context():
             db.create_all()
         g._database_initialized = True
-# --- End of new code ---
-
 
 @app.route('/')
 def index():
@@ -104,7 +100,9 @@ def notify_owner(college_id):
     else:
         owner_message_body += "\n\n(The finder did not leave a message)."
 
-    phone_to = item..phone_number.strip()
+    # --- THIS IS THE FIXED LINE ---
+    phone_to = item.phone_number.strip()
+    # --- END OF FIX ---
 
     if len(phone_to) == 10 and not phone_to.startswith('91'):
         print(f"Notice: Adding '91' to 10-digit number: {phone_to}")
