@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, url_for
+from flask import Flask, render_template, request, send_file, url_for, g
 from flask_sqlalchemy import SQLAlchemy
 from twilio.rest import Client
 import qrcode
@@ -8,22 +8,19 @@ from urllib.parse import quote
 
 app = Flask(__name__)
 
-# --- NEW: Database Configuration for Vercel & Local ---
-# Vercel will provide POSTGRES_URL environment variable
+# --- Database Configuration ---
 DATABASE_URL = os.environ.get('POSTGRES_URL')
 
 if not DATABASE_URL:
-    # Fallback to a local SQLite database if POSTGRES_URL is not set
     print("WARNING: POSTGRES_URL not set, falling back to local items.db")
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///items.db'
 else:
-    # Vercel uses 'postgres://' but SQLAlchemy needs 'postgresql://'
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace("postgres://", "postgresql://")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# --- Twilio Configuration (Get from Environment Variables) ---
+# --- Twilio Configuration ---
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
 TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM')
@@ -36,9 +33,17 @@ class Item(db.Model):
     phone_number = db.Column(db.String(20), nullable=False)
     custom_message = db.Column(db.String(300), nullable=True)
 
-# Create the database tables
-with app.app_context():
-    db.create_all()
+# --- NEW: Create tables safely ---
+# This function will run once before the first request
+@app.before_request
+def create_tables():
+    # Use 'g' to ensure this only runs ONCE per app start, not per request
+    if not getattr(g, '_database_initialized', False):
+        with app.app_context():
+            db.create_all()
+        g._database_initialized = True
+# --- End of new code ---
+
 
 @app.route('/')
 def index():
@@ -69,24 +74,20 @@ def generate_qr():
     db.session.add(item)
     db.session.commit()
 
-    # --- Generate QR in memory ---
     found_url = url_for('found_item', college_id=college_id, _external=True)
     img = qrcode.make(found_url)
 
-    # Save to an in-memory byte stream
     buf = io.BytesIO()
     img.save(buf)
-    buf.seek(0) # Rewind the stream to the beginning
+    buf.seek(0)
 
     return send_file(buf, mimetype='image/png')
 
-# --- Page the QR code links to ---
 @app.route('/found/<college_id>')
 def found_item(college_id):
     item = Item.query.filter_by(college_id=college_id).first_or_404()
     return render_template('found.html', college_id=item.college_id)
 
-# --- Backend route to send the WhatsApp message ---
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
     item = Item.query.filter_by(college_id=college_id).first_or_404()
@@ -96,14 +97,14 @@ def notify_owner(college_id):
         return "Error: Notification system is not configured.", 500
 
     finder_message = request.form.get('finder_message', '').strip()
-
     owner_message_body = f"🎉 Good news! Someone found your item ({item.college_id})."
+
     if finder_message:
         owner_message_body += f"\n\nThey left this message:\n'{finder_message}'"
     else:
         owner_message_body += "\n\n(The finder did not leave a message)."
 
-    phone_to = item.phone_number.strip()
+    phone_to = item..phone_number.strip()
 
     if len(phone_to) == 10 and not phone_to.startswith('91'):
         print(f"Notice: Adding '91' to 10-digit number: {phone_to}")
@@ -120,10 +121,8 @@ def notify_owner(college_id):
             from_=TWILIO_WHATSAPP_FROM,
             to=phone_to_formatted
         )
-
         print(f"Message sent successfully! SID: {message.sid}")
         return "Message sent successfully! The owner has been notified."
-
     except Exception as e:
         print(f"--- TWILIO ERROR ---: {e}")
         return "Error: Could not send notification.", 500
