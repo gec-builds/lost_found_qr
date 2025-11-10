@@ -9,10 +9,12 @@ from urllib.parse import quote
 app = Flask(__name__)
 
 # --- Database Configuration ---
-DATABASE_URL = os.environ.get('POSTGRES_URL')
+# --- THIS IS THE FIXED LINE ---
+DATABASE_URL = os.environ.get('POSTGRES_URL_NON_POOLING')
+# --- END OF FIX ---
 
 if not DATABASE_URL:
-    print("WARNING: POSTGRES_URL not set, falling back to local items.db")
+    print("WARNING: Database URL not set, falling back to local items.db")
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///items.db'
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL.replace("postgres://", "postgresql://")
@@ -100,9 +102,7 @@ def notify_owner(college_id):
     else:
         owner_message_body += "\n\n(The finder did not leave a message)."
 
-    # --- THIS IS THE FIXED LINE ---
     phone_to = item.phone_number.strip()
-    # --- END OF FIX ---
 
     if len(phone_to) == 10 and not phone_to.startswith('91'):
         print(f"Notice: Adding '91' to 10-digit number: {phone_to}")
