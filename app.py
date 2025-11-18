@@ -87,7 +87,7 @@ def generate_qr():
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
 
-        # --- NEW: Generate QR with logo ---
+        # --- NEW: Generate QR with Montserrat Font ---
 
         # 1. Create QR code object with high error correction
         qr = qrcode.QRCode(
@@ -98,13 +98,13 @@ def generate_qr():
         qr.add_data(found_url)
         qr.make(fit=True)
 
-        # 2. Create the QR image as an RGB image (to allow drawing)
+        # 2. Create the QR image
         img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
         draw = ImageDraw.Draw(img)
 
-        # 3. Calculate size and position for the central box
+        # 3. Calculate size for the central box
         width, height = img.size
-        box_size = 60  # Size of the white box
+        box_size = 70  # Increased box size
         left = (width - box_size) // 2
         top = (height - box_size) // 2
         right = (width + box_size) // 2
@@ -113,32 +113,32 @@ def generate_qr():
         # 4. Draw the white box
         draw.rectangle((left, top, right, bottom), fill='white', outline='black', width=2)
 
-        # 5. Load a font and draw the "L&F" text
-        font_size = 30
+        # 5. Load your new Montserrat font
+        font_size = 32 # Increased font size
         try:
-            # Try to load a default font (works on most systems)
-            font = ImageFont.load_default(size=font_size)
+            # This path is relative to your app.py file
+            font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-Bold.ttf')
+            font = ImageFont.truetype(font_path, size=font_size)
         except IOError:
-            # Fallback if default font isn't found
+            print("--- FONT ERROR: Montserrat-Bold.ttf not found! Using default. ---")
             font = ImageFont.load_default()
-            print("Warning: Default font size not available, using fallback.")
 
-        # Calculate text size to center it
-        text_bbox = draw.textbbox((0, 0), "L&F", font=font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
-        text_left = (width - text_width) // 2
-        text_top = (height - text_height) // 2
-
-        draw.text((text_left, text_top), "L&F", fill='black', font=font)
+        # 6. Draw "L&F" text, perfectly centered
+        draw.text(
+            (width / 2, height / 2),  # (x, y) coordinates
+            "L&F",                    # Text to draw
+            fill='black',             # Color
+            font=font,                # Font object
+            anchor="mm"               # "mm" = middle, middle (perfect center)
+        )
 
         # --- End of new code ---
 
         buf = io.BytesIO()
-        img.save(buf, format="PNG") # Explicitly save as PNG
+        img.save(buf, format="PNG")
         buf.seek(0)
 
-        print("--- Sending QR code file (with logo) ---")
+        print("--- Sending QR code file (with Montserrat logo) ---")
         return send_file(buf, mimetype='image/png')
 
     except Exception as e:
