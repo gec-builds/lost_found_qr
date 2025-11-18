@@ -1,3 +1,6 @@
+/* --- ADD THIS LINE AT THE TOP --- */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
 :root {
   --primary: #EC4186;   /* Pink */
   --dark: #38124A;      /* Dark Purple */
