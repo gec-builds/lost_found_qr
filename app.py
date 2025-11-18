@@ -36,8 +36,6 @@ class Item(db.Model):
 # --- Create tables safely ---
 @app.before_request
 def create_tables():
-    # This function runs before each request
-    # We use 'g' to make sure it only runs ONCE per app start
     try:
         if not getattr(g, '_database_initialized', False):
             with app.app_context():
@@ -81,15 +79,9 @@ def generate_qr():
         db.session.commit()
         print("--- DB Commit Succeeded ---")
 
-        # --- NEW: Refresh and Close Session ---
-        # This is critical for Vercel.
-        # It forces the app to confirm the data from the DB.
-        print(f"--- Refreshing item from DB ---")
+        # This forces a read from the DB
         db.session.refresh(item)
-        print(f"--- Successfully refreshed. Item ID: {item.id} ---")
-
-        # Close the session to finalize and release the connection
-        db.session.close()
+        print(f"--- DB Refresh Succeeded. Item ID: {item.id} ---")
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
         img = qrcode.make(found_url)
@@ -105,19 +97,29 @@ def generate_qr():
         print(f"--- ERROR: FAILED TO COMMIT TO DATABASE ---")
         print(e)
         db.session.rollback()
-        db.session.close() # Close on failure too
         return "Error: Could not save data to database. Please check logs.", 500
+    finally:
+        # --- NEW: Always close the session ---
+        db.session.close()
 
 
 @app.route('/found/<college_id>')
 def found_item(college_id):
-    # This code will now work, because the item will exist
-    item = Item.query.filter_by(college_id=college_id).first_or_404()
-    return render_template('found.html', college_id=item.college_id)
+    try:
+        # This will query the DB
+        item = Item.query.filter_by(college_id=college_id).first_or_404()
+        # This will render your found.html page
+        return render_template('found.html', college_id=item.college_id)
+    except Exception as e:
+        print(f"--- ERROR IN found_item ---: {e}")
+        return "Not Found", 404
+    finally:
+        # --- NEW: Always close the session ---
+        db.session.close()
 
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
-    # Your code, which is correct, will finally run
+    # This is your perfect, working code
     try:
         item = Item.query.filter_by(college_id=college_id).first_or_404()
 
@@ -157,5 +159,5 @@ def notify_owner(college_id):
         print(e)
         return "Error: Could not send notification.", 500
     finally:
-        # Always close the session after you're done
+        # --- NEW: Always close the session ---
         db.session.close()
