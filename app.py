@@ -36,7 +36,6 @@ class Item(db.Model):
 # --- Create tables safely ---
 @app.before_request
 def create_tables():
-    # Wrap in try/except to catch any startup errors
     try:
         if not getattr(g, '_database_initialized', False):
             with app.app_context():
@@ -45,7 +44,6 @@ def create_tables():
     except Exception as e:
         print(f"--- CRITICAL ERROR: FAILED TO CREATE TABLES ---")
         print(e)
-        # Re-raise the error to crash the app if tables can't be made
         raise e
 
 @app.route('/')
@@ -54,7 +52,6 @@ def index():
 
 @app.route('/generate_qr', methods=['POST'])
 def generate_qr():
-    # --- NEW: Wrap entire function in try/except ---
     try:
         college_id = request.form.get('collegeId', '').strip()
         phone_number = request.form.get('phoneNumber', '').strip()
@@ -82,6 +79,20 @@ def generate_qr():
         db.session.commit()
         print("--- DB Commit Succeeded ---")
 
+        # --- NEW: Read-after-write check ---
+        # We will immediately query for the item to confirm it was saved.
+        print(f"--- Confirming write for: {college_id} ---")
+        test_item = Item.query.filter_by(college_id=college_id).first()
+
+        if not test_item:
+            # If the item is not found, the commit failed.
+            print("--- !!! DB READ-AFTER-WRITE FAILED! Item not found. ---")
+            return "Error: Database write-confirmation failed. Please try again.", 500
+        else:
+            # If it is found, the save is good.
+            print(f"--- DB Read-After-Write Succeeded. Found: {test_item.college_id} ---")
+        # --- End of new check ---
+
         found_url = url_for('found_item', college_id=college_id, _external=True)
         img = qrcode.make(found_url)
 
@@ -93,10 +104,9 @@ def generate_qr():
         return send_file(buf, mimetype='image/png')
 
     except Exception as e:
-        # --- NEW: Catch the error, log it, and return a 500 ---
         print(f"--- ERROR: FAILED TO COMMIT TO DATABASE ---")
         print(e)
-        db.session.rollback() # Important: roll back the failed transaction
+        db.session.rollback()
         return "Error: Could not save data to database. Please check logs.", 500
 
 
@@ -107,7 +117,6 @@ def found_item(college_id):
 
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
-    # --- NEW: Wrap in try/except ---
     try:
         item = Item.query.filter_by(college_id=college_id).first_or_404()
 
@@ -143,7 +152,6 @@ def notify_owner(college_id):
         return "Message sent successfully! The owner has been notified."
 
     except Exception as e:
-        # --- NEW: Catch any errors during notification ---
         print(f"--- ERROR: FAILED TO SEND TWILIO MESSAGE ---")
         print(e)
         return "Error: Could not send notification.", 500
