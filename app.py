@@ -114,7 +114,7 @@ def generate_qr():
         draw.rectangle((left, top, right, bottom), fill='white', outline='black', width=2)
 
         # 5. Load your new Montserrat font
-        font_size = 50 # <-- INCREASED FONT SIZE
+        font_size = 100 # <-- INCREASED FONT SIZE
         try:
             # Try to use ExtraBold first
             font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-ExtraBold.ttf')
