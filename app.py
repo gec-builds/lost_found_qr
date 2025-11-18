@@ -9,9 +9,7 @@ from urllib.parse import quote
 app = Flask(__name__)
 
 # --- Database Configuration ---
-# --- THIS IS THE FIXED LINE ---
 DATABASE_URL = os.environ.get('POSTGRES_URL_NON_POOLING')
-# --- END OF FIX ---
 
 if not DATABASE_URL:
     print("WARNING: Database URL not set, falling back to local items.db")
@@ -38,10 +36,17 @@ class Item(db.Model):
 # --- Create tables safely ---
 @app.before_request
 def create_tables():
-    if not getattr(g, '_database_initialized', False):
-        with app.app_context():
-            db.create_all()
-        g._database_initialized = True
+    # Wrap in try/except to catch any startup errors
+    try:
+        if not getattr(g, '_database_initialized', False):
+            with app.app_context():
+                db.create_all()
+            g._database_initialized = True
+    except Exception as e:
+        print(f"--- CRITICAL ERROR: FAILED TO CREATE TABLES ---")
+        print(e)
+        # Re-raise the error to crash the app if tables can't be made
+        raise e
 
 @app.route('/')
 def index():
@@ -49,37 +54,51 @@ def index():
 
 @app.route('/generate_qr', methods=['POST'])
 def generate_qr():
-    college_id = request.form.get('collegeId', '').strip()
-    phone_number = request.form.get('phoneNumber', '').strip()
-    custom_message_input = request.form.get('customMessage', '').strip()
+    # --- NEW: Wrap entire function in try/except ---
+    try:
+        college_id = request.form.get('collegeId', '').strip()
+        phone_number = request.form.get('phoneNumber', '').strip()
+        custom_message_input = request.form.get('customMessage', '').strip()
 
-    if not college_id or not phone_number:
-        return "Error: College ID and Phone number required", 400
+        if not college_id or not phone_number:
+            return "Error: College ID and Phone number required", 400
 
-    phone_number = ''.join(filter(str.isdigit, phone_number))
+        phone_number = ''.join(filter(str.isdigit, phone_number))
 
-    if custom_message_input:
-        owner_message = custom_message_input
-    else:
-        owner_message = f"Hello, I found the item for College ID: {college_id}. Please let me know how I can return it."
+        if custom_message_input:
+            owner_message = custom_message_input
+        else:
+            owner_message = f"Hello, I found the item for College ID: {college_id}. Please let me know how I can return it."
 
-    item = Item.query.filter_by(college_id=college_id).first()
-    if not item:
-        item = Item(college_id=college_id)
+        item = Item.query.filter_by(college_id=college_id).first()
+        if not item:
+            item = Item(college_id=college_id)
 
-    item.phone_number = phone_number
-    item.custom_message = owner_message
-    db.session.add(item)
-    db.session.commit()
+        item.phone_number = phone_number
+        item.custom_message = owner_message
 
-    found_url = url_for('found_item', college_id=college_id, _external=True)
-    img = qrcode.make(found_url)
+        print(f"--- Attempting to add to DB: {item.college_id} ---")
+        db.session.add(item)
+        db.session.commit()
+        print("--- DB Commit Succeeded ---")
 
-    buf = io.BytesIO()
-    img.save(buf)
-    buf.seek(0)
+        found_url = url_for('found_item', college_id=college_id, _external=True)
+        img = qrcode.make(found_url)
 
-    return send_file(buf, mimetype='image/png')
+        buf = io.BytesIO()
+        img.save(buf)
+        buf.seek(0)
+
+        print("--- Sending QR code file ---")
+        return send_file(buf, mimetype='image/png')
+
+    except Exception as e:
+        # --- NEW: Catch the error, log it, and return a 500 ---
+        print(f"--- ERROR: FAILED TO COMMIT TO DATABASE ---")
+        print(e)
+        db.session.rollback() # Important: roll back the failed transaction
+        return "Error: Could not save data to database. Please check logs.", 500
+
 
 @app.route('/found/<college_id>')
 def found_item(college_id):
@@ -88,29 +107,30 @@ def found_item(college_id):
 
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
-    item = Item.query.filter_by(college_id=college_id).first_or_404()
-
-    if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM]):
-        print("ERROR: Twilio environment variables are not set.")
-        return "Error: Notification system is not configured.", 500
-
-    finder_message = request.form.get('finder_message', '').strip()
-    owner_message_body = f"🎉 Good news! Someone found your item ({item.college_id})."
-
-    if finder_message:
-        owner_message_body += f"\n\nThey left this message:\n'{finder_message}'"
-    else:
-        owner_message_body += "\n\n(The finder did not leave a message)."
-
-    phone_to = item.phone_number.strip()
-
-    if len(phone_to) == 10 and not phone_to.startswith('91'):
-        print(f"Notice: Adding '91' to 10-digit number: {phone_to}")
-        phone_to = f"91{phone_to}"
-
-    phone_to_formatted = f"whatsapp:+{phone_to}"
-
+    # --- NEW: Wrap in try/except ---
     try:
+        item = Item.query.filter_by(college_id=college_id).first_or_404()
+
+        if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM]):
+            print("ERROR: Twilio environment variables are not set.")
+            return "Error: Notification system is not configured.", 500
+
+        finder_message = request.form.get('finder_message', '').strip()
+        owner_message_body = f"🎉 Good news! Someone found your item ({item.college_id})."
+
+        if finder_message:
+            owner_message_body += f"\n\nThey left this message:\n'{finder_message}'"
+        else:
+            owner_message_body += "\n\n(The finder did not leave a message)."
+
+        phone_to = item.phone_number.strip()
+
+        if len(phone_to) == 10 and not phone_to.startswith('91'):
+            print(f"Notice: Adding '91' to 10-digit number: {phone_to}")
+            phone_to = f"91{phone_to}"
+
+        phone_to_formatted = f"whatsapp:+{phone_to}"
+
         print(f"Attempting to send message from {TWILIO_WHATSAPP_FROM} to {phone_to_formatted}")
         client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
@@ -121,6 +141,9 @@ def notify_owner(college_id):
         )
         print(f"Message sent successfully! SID: {message.sid}")
         return "Message sent successfully! The owner has been notified."
+
     except Exception as e:
-        print(f"--- TWILIO ERROR ---: {e}")
+        # --- NEW: Catch any errors during notification ---
+        print(f"--- ERROR: FAILED TO SEND TWILIO MESSAGE ---")
+        print(e)
         return "Error: Could not send notification.", 500
