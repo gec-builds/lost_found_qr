@@ -6,7 +6,7 @@ import os
 import io
 from urllib.parse import quote
 
-# --- NEW: Imports for adding the logo ---
+# --- Imports for adding the logo ---
 from PIL import Image, ImageDraw, ImageFont
 
 app = Flask(__name__)
@@ -87,9 +87,9 @@ def generate_qr():
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
 
-        # --- NEW: Generate QR with Montserrat Font ---
+        # --- NEW: Generate QR with LARGER Montserrat Font ---
 
-        # 1. Create QR code object with high error correction
+        # 1. Create QR code object
         qr = qrcode.QRCode(
             error_correction=qrcode.constants.ERROR_CORRECT_H,
             box_size=10,
@@ -104,32 +104,40 @@ def generate_qr():
 
         # 3. Calculate size for the central box
         width, height = img.size
-        box_size = 100  # Increased box size
+        box_size = 90  # <-- INCREASED BOX SIZE
         left = (width - box_size) // 2
         top = (height - box_size) // 2
         right = (width + box_size) // 2
         bottom = (height + box_size) // 2
 
         # 4. Draw the white box
-        draw.rectangle((left, top, right, bottom), fill='white', outline='white', width=2)
+        draw.rectangle((left, top, right, bottom), fill='white', outline='black', width=2)
 
         # 5. Load your new Montserrat font
-        font_size = 700 # Increased font size
+        font_size = 50 # <-- INCREASED FONT SIZE
         try:
-            # This path is relative to your app.py file
-            font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-Bold.ttf')
+            # Try to use ExtraBold first
+            font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-ExtraBold.ttf')
             font = ImageFont.truetype(font_path, size=font_size)
+            print("--- Loaded Montserrat-ExtraBold.ttf ---")
         except IOError:
-            print("--- FONT ERROR: Montserrat-Bold.ttf not found! Using default. ---")
-            font = ImageFont.load_default()
+            try:
+                # Fallback to Bold
+                font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-Bold.ttf')
+                font = ImageFont.truetype(font_path, size=font_size)
+                print("--- Loaded Montserrat-Bold.ttf ---")
+            except IOError:
+                # Fallback to default
+                print("--- FONT ERROR: Montserrat not found! Using default. ---")
+                font = ImageFont.load_default()
 
         # 6. Draw "L&F" text, perfectly centered
         draw.text(
-            (width / 1, height / 1),  # (x, y) coordinates
-            "L&F",                    # Text to draw
-            fill='black',             # Color
-            font=font,                # Font object
-            anchor="mm"               # "mm" = middle, middle (perfect center)
+            (width / 2, height / 2),
+            "L&F",
+            fill='black',
+            font=font,
+            anchor="mm"
         )
 
         # --- End of new code ---
@@ -138,7 +146,7 @@ def generate_qr():
         img.save(buf, format="PNG")
         buf.seek(0)
 
-        print("--- Sending QR code file (with Montserrat logo) ---")
+        print("--- Sending QR code file (with LARGE logo) ---")
         return send_file(buf, mimetype='image/png')
 
     except Exception as e:
@@ -180,7 +188,7 @@ def notify_owner(college_id):
 
         phone_to = item.phone_number.strip()
 
-        if len(phone_to) == 10 and not phone_to.startswith('91'):
+        if len(phone_to) == 10 and not phone_t.startswith('91'):
             print(f"Notice: Adding '91' to 10-digit number: {phone_to}")
             phone_to = f"91{phone_to}"
 
