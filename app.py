@@ -114,7 +114,7 @@ def generate_qr():
         draw.rectangle((left, top, right, bottom), fill='white', outline='white', width=2)
 
         # 5. Load your new Montserrat font
-        font_size = 70 # Increased font size
+        font_size = 700 # Increased font size
         try:
             # This path is relative to your app.py file
             font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-Bold.ttf')
