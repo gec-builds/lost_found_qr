@@ -1,5 +1,7 @@
 /* --- ADD THIS LINE AT THE TOP --- */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
 
 :root {
   --primary: #EC4186;   /* Pink */
@@ -13,7 +15,7 @@
 }
 
 * { box-sizing:border-box; margin:0; padding:0; }
-body { font-family: "Poppins", sans-serif; background: var(--bg); color: var(--dark); min-height:100vh; display:flex; flex-direction:column; }
+body { font-family: "Poppins", Montserrat, sans-serif; background: var(--bg); color: var(--dark); min-height:100vh; display:flex; flex-direction:column; }
 
 header.hero {
   background: linear-gradient(135deg, var(--primary), var(--accent));
