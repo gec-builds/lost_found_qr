@@ -6,9 +6,6 @@ import os
 import io
 from urllib.parse import quote
 
-# --- Imports for adding the logo ---
-from PIL import Image, ImageDraw, ImageFont
-
 app = Flask(__name__)
 
 # --- Database Configuration ---
@@ -82,71 +79,18 @@ def generate_qr():
         db.session.commit()
         print("--- DB Commit Succeeded ---")
 
+        # This forces a read from the DB
         db.session.refresh(item)
         print(f"--- DB Refresh Succeeded. Item ID: {item.id} ---")
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
-
-        # --- NEW: Generate QR with LARGER Montserrat Font ---
-
-        # 1. Create QR code object
-        qr = qrcode.QRCode(
-            error_correction=qrcode.constants.ERROR_CORRECT_H,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(found_url)
-        qr.make(fit=True)
-
-        # 2. Create the QR image
-        img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
-        draw = ImageDraw.Draw(img)
-
-        # 3. Calculate size for the central box
-        width, height = img.size
-        box_size = 90  # <-- INCREASED BOX SIZE
-        left = (width - box_size) // 2
-        top = (height - box_size) // 2
-        right = (width + box_size) // 2
-        bottom = (height + box_size) // 2
-
-        # 4. Draw the white box
-        draw.rectangle((left, top, right, bottom), fill='white', outline='black', width=2)
-
-        # 5. Load your new Montserrat font
-        font_size = 100 # <-- INCREASED FONT SIZE
-        try:
-            # Try to use ExtraBold first
-            font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-ExtraBold.ttf')
-            font = ImageFont.truetype(font_path, size=font_size)
-            print("--- Loaded Montserrat-ExtraBold.ttf ---")
-        except IOError:
-            try:
-                # Fallback to Bold
-                font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-Bold.ttf')
-                font = ImageFont.truetype(font_path, size=font_size)
-                print("--- Loaded Montserrat-Bold.ttf ---")
-            except IOError:
-                # Fallback to default
-                print("--- FONT ERROR: Montserrat not found! Using default. ---")
-                font = ImageFont.load_default()
-
-        # 6. Draw "L&F" text, perfectly centered
-        draw.text(
-            (width / 2, height / 2),
-            "L&F",
-            fill='black',
-            font=font,
-            anchor="mm"
-        )
-
-        # --- End of new code ---
+        img = qrcode.make(found_url)
 
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
+        img.save(buf)
         buf.seek(0)
 
-        print("--- Sending QR code file (with LARGE logo) ---")
+        print("--- Sending QR code file ---")
         return send_file(buf, mimetype='image/png')
 
     except Exception as e:
@@ -155,22 +99,27 @@ def generate_qr():
         db.session.rollback()
         return "Error: Could not save data to database. Please check logs.", 500
     finally:
+        # --- NEW: Always close the session ---
         db.session.close()
 
 
 @app.route('/found/<college_id>')
 def found_item(college_id):
     try:
+        # This will query the DB
         item = Item.query.filter_by(college_id=college_id).first_or_404()
+        # This will render your found.html page
         return render_template('found.html', college_id=item.college_id)
     except Exception as e:
         print(f"--- ERROR IN found_item ---: {e}")
         return "Not Found", 404
     finally:
+        # --- NEW: Always close the session ---
         db.session.close()
 
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
+    # This is your perfect, working code
     try:
         item = Item.query.filter_by(college_id=college_id).first_or_404()
 
@@ -188,7 +137,7 @@ def notify_owner(college_id):
 
         phone_to = item.phone_number.strip()
 
-        if len(phone_to) == 10 and not phone_t.startswith('91'):
+        if len(phone_to) == 10 and not phone_to.startswith('91'):
             print(f"Notice: Adding '91' to 10-digit number: {phone_to}")
             phone_to = f"91{phone_to}"
 
@@ -210,4 +159,5 @@ def notify_owner(college_id):
         print(e)
         return "Error: Could not send notification.", 500
     finally:
+        # --- NEW: Always close the session ---
         db.session.close()
