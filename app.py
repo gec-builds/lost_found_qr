@@ -104,17 +104,17 @@ def generate_qr():
 
         # 3. Calculate size for the central box
         width, height = img.size
-        box_size = 70  # Increased box size
+        box_size = 100  # Increased box size
         left = (width - box_size) // 2
         top = (height - box_size) // 2
         right = (width + box_size) // 2
         bottom = (height + box_size) // 2
 
         # 4. Draw the white box
-        draw.rectangle((left, top, right, bottom), fill='white', outline='black', width=2)
+        draw.rectangle((left, top, right, bottom), fill='white', outline='white', width=2)
 
         # 5. Load your new Montserrat font
-        font_size = 32 # Increased font size
+        font_size = 70 # Increased font size
         try:
             # This path is relative to your app.py file
             font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-Bold.ttf')
