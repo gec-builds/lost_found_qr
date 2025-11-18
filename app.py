@@ -6,6 +6,9 @@ import os
 import io
 from urllib.parse import quote
 
+# --- NEW: Imports for adding the logo ---
+from PIL import Image, ImageDraw, ImageFont
+
 app = Flask(__name__)
 
 # --- Database Configuration ---
@@ -79,18 +82,63 @@ def generate_qr():
         db.session.commit()
         print("--- DB Commit Succeeded ---")
 
-        # This forces a read from the DB
         db.session.refresh(item)
         print(f"--- DB Refresh Succeeded. Item ID: {item.id} ---")
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
-        img = qrcode.make(found_url)
+
+        # --- NEW: Generate QR with logo ---
+
+        # 1. Create QR code object with high error correction
+        qr = qrcode.QRCode(
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(found_url)
+        qr.make(fit=True)
+
+        # 2. Create the QR image as an RGB image (to allow drawing)
+        img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
+        draw = ImageDraw.Draw(img)
+
+        # 3. Calculate size and position for the central box
+        width, height = img.size
+        box_size = 60  # Size of the white box
+        left = (width - box_size) // 2
+        top = (height - box_size) // 2
+        right = (width + box_size) // 2
+        bottom = (height + box_size) // 2
+
+        # 4. Draw the white box
+        draw.rectangle((left, top, right, bottom), fill='white', outline='black', width=2)
+
+        # 5. Load a font and draw the "L&F" text
+        font_size = 30
+        try:
+            # Try to load a default font (works on most systems)
+            font = ImageFont.load_default(size=font_size)
+        except IOError:
+            # Fallback if default font isn't found
+            font = ImageFont.load_default()
+            print("Warning: Default font size not available, using fallback.")
+
+        # Calculate text size to center it
+        text_bbox = draw.textbbox((0, 0), "L&F", font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+        text_left = (width - text_width) // 2
+        text_top = (height - text_height) // 2
+
+        draw.text((text_left, text_top), "L&F", fill='black', font=font)
+
+        # --- End of new code ---
 
         buf = io.BytesIO()
-        img.save(buf)
+        img.save(buf, format="PNG") # Explicitly save as PNG
         buf.seek(0)
 
-        print("--- Sending QR code file ---")
+        print("--- Sending QR code file (with logo) ---")
         return send_file(buf, mimetype='image/png')
 
     except Exception as e:
@@ -99,27 +147,22 @@ def generate_qr():
         db.session.rollback()
         return "Error: Could not save data to database. Please check logs.", 500
     finally:
-        # --- NEW: Always close the session ---
         db.session.close()
 
 
 @app.route('/found/<college_id>')
 def found_item(college_id):
     try:
-        # This will query the DB
         item = Item.query.filter_by(college_id=college_id).first_or_404()
-        # This will render your found.html page
         return render_template('found.html', college_id=item.college_id)
     except Exception as e:
         print(f"--- ERROR IN found_item ---: {e}")
         return "Not Found", 404
     finally:
-        # --- NEW: Always close the session ---
         db.session.close()
 
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
-    # This is your perfect, working code
     try:
         item = Item.query.filter_by(college_id=college_id).first_or_404()
 
@@ -159,5 +202,4 @@ def notify_owner(college_id):
         print(e)
         return "Error: Could not send notification.", 500
     finally:
-        # --- NEW: Always close the session ---
         db.session.close()
