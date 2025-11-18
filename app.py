@@ -125,7 +125,7 @@ def generate_qr():
 
         # 6. Draw "L&F" text, perfectly centered
         draw.text(
-            (width / 2, height / 2),  # (x, y) coordinates
+            (width / 1, height / 1),  # (x, y) coordinates
             "L&F",                    # Text to draw
             fill='black',             # Color
             font=font,                # Font object
