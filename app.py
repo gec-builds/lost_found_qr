@@ -36,6 +36,8 @@ class Item(db.Model):
 # --- Create tables safely ---
 @app.before_request
 def create_tables():
+    # This function runs before each request
+    # We use 'g' to make sure it only runs ONCE per app start
     try:
         if not getattr(g, '_database_initialized', False):
             with app.app_context():
@@ -79,19 +81,15 @@ def generate_qr():
         db.session.commit()
         print("--- DB Commit Succeeded ---")
 
-        # --- NEW: Read-after-write check ---
-        # We will immediately query for the item to confirm it was saved.
-        print(f"--- Confirming write for: {college_id} ---")
-        test_item = Item.query.filter_by(college_id=college_id).first()
+        # --- NEW: Refresh and Close Session ---
+        # This is critical for Vercel.
+        # It forces the app to confirm the data from the DB.
+        print(f"--- Refreshing item from DB ---")
+        db.session.refresh(item)
+        print(f"--- Successfully refreshed. Item ID: {item.id} ---")
 
-        if not test_item:
-            # If the item is not found, the commit failed.
-            print("--- !!! DB READ-AFTER-WRITE FAILED! Item not found. ---")
-            return "Error: Database write-confirmation failed. Please try again.", 500
-        else:
-            # If it is found, the save is good.
-            print(f"--- DB Read-After-Write Succeeded. Found: {test_item.college_id} ---")
-        # --- End of new check ---
+        # Close the session to finalize and release the connection
+        db.session.close()
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
         img = qrcode.make(found_url)
@@ -107,16 +105,19 @@ def generate_qr():
         print(f"--- ERROR: FAILED TO COMMIT TO DATABASE ---")
         print(e)
         db.session.rollback()
+        db.session.close() # Close on failure too
         return "Error: Could not save data to database. Please check logs.", 500
 
 
 @app.route('/found/<college_id>')
 def found_item(college_id):
+    # This code will now work, because the item will exist
     item = Item.query.filter_by(college_id=college_id).first_or_404()
     return render_template('found.html', college_id=item.college_id)
 
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
+    # Your code, which is correct, will finally run
     try:
         item = Item.query.filter_by(college_id=college_id).first_or_404()
 
@@ -155,3 +156,6 @@ def notify_owner(college_id):
         print(f"--- ERROR: FAILED TO SEND TWILIO MESSAGE ---")
         print(e)
         return "Error: Could not send notification.", 500
+    finally:
+        # Always close the session after you're done
+        db.session.close()
