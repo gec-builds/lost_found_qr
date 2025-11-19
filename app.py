@@ -6,6 +6,9 @@ import os
 import io
 from urllib.parse import quote
 
+# --- Imports for adding the logo ---
+from PIL import Image, ImageDraw, ImageFont
+
 app = Flask(__name__)
 
 # --- Database Configuration ---
@@ -79,19 +82,74 @@ def generate_qr():
         db.session.commit()
         print("--- DB Commit Succeeded ---")
 
-        # This forces a read from the DB
         db.session.refresh(item)
         print(f"--- DB Refresh Succeeded. Item ID: {item.id} ---")
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
-        img = qrcode.make(found_url)
+
+        # --- Generate QR with Logo ---
+
+        # 1. Create QR code object
+        qr = qrcode.QRCode(
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(found_url)
+        qr.make(fit=True)
+
+        # 2. Create the QR image
+        img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
+        draw = ImageDraw.Draw(img)
+
+        # 3. Calculate size for the central box
+        width, height = img.size
+        box_size = 90
+        left = (width - box_size) // 2
+        top = (height - box_size) // 2
+        right = (width + box_size) // 2
+        bottom = (height + box_size) // 2
+
+        # 4. Draw the white box
+        draw.rectangle((left, top, right, bottom), fill='white', outline='black', width=2)
+
+        # 5. Load Montserrat font
+        font_size = 75
+        try:
+            font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-ExtraBold.ttf')
+            font = ImageFont.truetype(font_path, size=font_size)
+        except IOError:
+            try:
+                font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-Bold.ttf')
+                font = ImageFont.truetype(font_path, size=font_size)
+            except IOError:
+                print("--- FONT ERROR: Montserrat not found! Using default. ---")
+                font = ImageFont.load_default()
+
+        # 6. Draw "L&F" text
+        draw.text(
+            (width / 2, height / 2),
+            "L&F",
+            fill='black',
+            font=font,
+            anchor="mm"
+        )
+
+        # --- End of QR generation ---
 
         buf = io.BytesIO()
-        img.save(buf)
+        img.save(buf, format="PNG")
         buf.seek(0)
 
-        print("--- Sending QR code file ---")
-        return send_file(buf, mimetype='image/png')
+        print(f"--- Sending QR code file: {college_id}.png ---")
+
+        # --- NEW: Send file with specific download name ---
+        return send_file(
+            buf,
+            mimetype='image/png',
+            as_attachment=True,
+            download_name=f'{college_id}.png'
+        )
 
     except Exception as e:
         print(f"--- ERROR: FAILED TO COMMIT TO DATABASE ---")
@@ -99,27 +157,22 @@ def generate_qr():
         db.session.rollback()
         return "Error: Could not save data to database. Please check logs.", 500
     finally:
-        # --- NEW: Always close the session ---
         db.session.close()
 
 
 @app.route('/found/<college_id>')
 def found_item(college_id):
     try:
-        # This will query the DB
         item = Item.query.filter_by(college_id=college_id).first_or_404()
-        # This will render your found.html page
         return render_template('found.html', college_id=item.college_id)
     except Exception as e:
         print(f"--- ERROR IN found_item ---: {e}")
         return "Not Found", 404
     finally:
-        # --- NEW: Always close the session ---
         db.session.close()
 
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
-    # This is your perfect, working code
     try:
         item = Item.query.filter_by(college_id=college_id).first_or_404()
 
@@ -159,5 +212,4 @@ def notify_owner(college_id):
         print(e)
         return "Error: Could not send notification.", 500
     finally:
-        # --- NEW: Always close the session ---
         db.session.close()

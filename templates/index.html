@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <!-- Hero Section -->
   <header class="hero">
   <div class="hero-content">
     <h1>College Lost & Found QR System</h1>
@@ -20,7 +19,6 @@
   </div>
 </header>
 
-  <!-- QR Generator Section -->
   <main class="container" id="generate">
     <div class="card">
       <h2>Generate Your WhatsApp QR Code</h2>
@@ -49,7 +47,6 @@
   </footer>
 
 
-  <!-- Script for QR Preview -->
   <script>
     const form = document.getElementById('qrForm');
     const preview = document.getElementById('qrPreview');
@@ -58,6 +55,10 @@
       e.preventDefault();
       preview.textContent = 'Generating QR...';
       const formData = new FormData(form);
+
+      // --- NEW: Capture the College ID to use for the filename ---
+      const collegeId = formData.get('collegeId').trim();
+
       const response = await fetch('/generate_qr', { method: 'POST', body: formData });
 
       if (!response.ok) {
@@ -77,7 +78,11 @@
 
       const dl = document.createElement('a');
       dl.href = imgURL;
-      dl.download = 'qr_code.png';
+
+      // --- NEW: Set the filename to [CollegeID].png ---
+      // If they typed "STU123", the file will be "STU123.png"
+      dl.download = `${collegeId}.png`;
+
       dl.textContent = 'Download QR';
       dl.className = 'btn';
       preview.appendChild(dl);
