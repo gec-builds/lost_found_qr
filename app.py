@@ -79,26 +79,19 @@ def generate_qr():
         db.session.commit()
         print("--- DB Commit Succeeded ---")
 
+        # This forces a read from the DB
         db.session.refresh(item)
         print(f"--- DB Refresh Succeeded. Item ID: {item.id} ---")
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
-
-        # --- STANDARD QR GENERATION (No Logo) ---
         img = qrcode.make(found_url)
 
         buf = io.BytesIO()
         img.save(buf)
         buf.seek(0)
 
-        print(f"--- Sending QR code file: {college_id}.png ---")
-
-        return send_file(
-            buf,
-            mimetype='image/png',
-            as_attachment=True,
-            download_name=f'{college_id}.png'
-        )
+        print("--- Sending QR code file ---")
+        return send_file(buf, mimetype='image/png')
 
     except Exception as e:
         print(f"--- ERROR: FAILED TO COMMIT TO DATABASE ---")
@@ -106,22 +99,27 @@ def generate_qr():
         db.session.rollback()
         return "Error: Could not save data to database. Please check logs.", 500
     finally:
+        # --- NEW: Always close the session ---
         db.session.close()
 
 
 @app.route('/found/<college_id>')
 def found_item(college_id):
     try:
+        # This will query the DB
         item = Item.query.filter_by(college_id=college_id).first_or_404()
+        # This will render your found.html page
         return render_template('found.html', college_id=item.college_id)
     except Exception as e:
         print(f"--- ERROR IN found_item ---: {e}")
         return "Not Found", 404
     finally:
+        # --- NEW: Always close the session ---
         db.session.close()
 
 @app.route('/notify/<college_id>', methods=['POST'])
 def notify_owner(college_id):
+    # This is your perfect, working code
     try:
         item = Item.query.filter_by(college_id=college_id).first_or_404()
 
@@ -161,4 +159,5 @@ def notify_owner(college_id):
         print(e)
         return "Error: Could not send notification.", 500
     finally:
+        # --- NEW: Always close the session ---
         db.session.close()
