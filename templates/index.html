@@ -38,14 +38,12 @@
     </div>
   </main>
 
-
   <footer>
     <p>
       &copy; 2025 Creative Thinking Project | College Lost & Found QR System
       Designed for simplicity, speed, and efficiency in item recovery.
     </p>
   </footer>
-
 
   <script>
     const form = document.getElementById('qrForm');
@@ -56,7 +54,7 @@
       preview.textContent = 'Generating QR...';
       const formData = new FormData(form);
 
-      // --- NEW: Capture the College ID to use for the filename ---
+      // --- CRITICAL: Capture the College ID for the filename ---
       const collegeId = formData.get('collegeId').trim();
 
       const response = await fetch('/generate_qr', { method: 'POST', body: formData });
@@ -79,8 +77,8 @@
       const dl = document.createElement('a');
       dl.href = imgURL;
 
-      // --- NEW: Set the filename to [CollegeID].png ---
-      // If they typed "STU123", the file will be "STU123.png"
+      // --- CRITICAL: Use the College ID for the download filename ---
+      // This ensures the file is named "STU123.png" instead of "qr_code.png"
       dl.download = `${collegeId}.png`;
 
       dl.textContent = 'Download QR';
