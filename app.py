@@ -6,9 +6,6 @@ import os
 import io
 from urllib.parse import quote
 
-# --- Imports for adding the logo ---
-from PIL import Image, ImageDraw, ImageFont
-
 app = Flask(__name__)
 
 # --- Database Configuration ---
@@ -87,63 +84,15 @@ def generate_qr():
 
         found_url = url_for('found_item', college_id=college_id, _external=True)
 
-        # --- Generate QR with Logo ---
-
-        # 1. Create QR code object
-        qr = qrcode.QRCode(
-            error_correction=qrcode.constants.ERROR_CORRECT_H,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(found_url)
-        qr.make(fit=True)
-
-        # 2. Create the QR image
-        img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
-        draw = ImageDraw.Draw(img)
-
-        # 3. Calculate size for the central box
-        width, height = img.size
-        box_size = 90
-        left = (width - box_size) // 2
-        top = (height - box_size) // 2
-        right = (width + box_size) // 2
-        bottom = (height + box_size) // 2
-
-        # 4. Draw the white box
-        draw.rectangle((left, top, right, bottom), fill='white', outline='black', width=2)
-
-        # 5. Load Montserrat font
-        font_size = 75
-        try:
-            font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-ExtraBold.ttf')
-            font = ImageFont.truetype(font_path, size=font_size)
-        except IOError:
-            try:
-                font_path = os.path.join(app.root_path, 'static', 'fonts', 'Montserrat-Bold.ttf')
-                font = ImageFont.truetype(font_path, size=font_size)
-            except IOError:
-                print("--- FONT ERROR: Montserrat not found! Using default. ---")
-                font = ImageFont.load_default()
-
-        # 6. Draw "L&F" text
-        draw.text(
-            (width / 2, height / 2),
-            "L&F",
-            fill='black',
-            font=font,
-            anchor="mm"
-        )
-
-        # --- End of QR generation ---
+        # --- STANDARD QR GENERATION (No Logo) ---
+        img = qrcode.make(found_url)
 
         buf = io.BytesIO()
-        img.save(buf, format="PNG")
+        img.save(buf)
         buf.seek(0)
 
         print(f"--- Sending QR code file: {college_id}.png ---")
 
-        # --- NEW: Send file with specific download name ---
         return send_file(
             buf,
             mimetype='image/png',
